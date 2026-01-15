@@ -615,11 +615,31 @@ main {
     border-color: var(--accent-a);
 }
 
+.article-title-link {
+    color: var(--accent-a);
+    text-decoration: none;
+    font-weight: 500;
+    display: block;
+    margin-bottom: 0.4rem;
+    line-height: 1.4;
+}
+
+.article-title-link:hover {
+    text-decoration: underline;
+    color: #d97706;
+}
+
 .cluster-article-item p {
     color: var(--text);
     line-height: 1.5;
     margin: 0;
     font-size: 0.9rem;
+}
+
+.article-meta {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    margin-top: 0.3rem;
 }
 
 /* Modal Styles */

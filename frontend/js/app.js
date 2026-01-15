@@ -156,9 +156,8 @@ class HackerNewsAnalysisApp {
             // Both searches completed successfully
             // User can manually navigate to Cluster Analysis page when ready
 
-            // Restore compare button after successful comparison
-            compareBtn.disabled = false;
-            compareBtn.textContent = 'Compare';
+            // Hide compare button after successful comparison
+            compareBtn.style.display = 'none';
 
         } catch (error) {
             console.error('Compare error:', error);
@@ -197,6 +196,9 @@ class HackerNewsAnalysisApp {
 
             // Show visualization section
             document.getElementById('visualization-section').style.display = 'block';
+
+            // Hide generate button after successful generation
+            generateBtn.style.display = 'none';
 
             // Scroll to visualization
             document.getElementById('visualization-section').scrollIntoView({
@@ -239,7 +241,7 @@ class HackerNewsAnalysisApp {
             this.searchData[section] = response;
 
             // Get stories for display
-            const stories = response.stories || response.tweets; // Support both fields
+            const stories = response.stories;
             if (!stories || stories.length === 0) {
                 throw new Error('No stories found for this topic. Try a different search term.');
             }

@@ -2,7 +2,7 @@ import umap
 import numpy as np
 from sklearn.cluster import KMeans
 from typing import List, Dict, Any
-from app.models import Tweet, ClusterData
+from app.models import Story, ClusterData
 
 
 class ClusteringService:
@@ -121,7 +121,7 @@ class ClusteringService:
         self,
         search_id: str,
         embeddings: np.ndarray,
-        tweets: List[Tweet],
+        stories: List[Story],
         algorithm: str = 'kmeans',
         n_clusters: int = None
     ) -> ClusterData:
@@ -131,7 +131,7 @@ class ClusteringService:
         Args:
             search_id: Unique search identifier
             embeddings: High-dimensional embeddings
-            tweets: List of Story/Tweet objects
+            stories: List of Story objects
             algorithm: Clustering algorithm (only 'kmeans' is supported)
             n_clusters: Number of clusters (auto-determined if not provided)
 
@@ -160,12 +160,12 @@ class ClusteringService:
         # Prepare cluster info
         cluster_info = {}
         for label in unique_labels:
-            cluster_stories = [tweets[i] for i, l in enumerate(labels) if l == label]
+            cluster_stories_list = [stories[i] for i, l in enumerate(labels) if l == label]
             # Calculate average score (support both score and likes fields)
             avg_score = 0
-            if cluster_stories:
+            if cluster_stories_list:
                 scores = []
-                for s in cluster_stories:
+                for s in cluster_stories_list:
                     if hasattr(s, 'score'):
                         scores.append(s.score)
                     elif hasattr(s, 'likes'):
@@ -173,7 +173,7 @@ class ClusteringService:
                 avg_score = sum(scores) / len(scores) if scores else 0
             
             cluster_info[int(label)] = {
-                'size': len(cluster_stories),
+                'size': len(cluster_stories_list),
                 'avg_likes': avg_score,  # Keep field name for compatibility
                 'label': f"Cluster {label}"
             }
@@ -181,7 +181,7 @@ class ClusteringService:
         # Create ClusterData for visualization
         # Use title if available, otherwise text
         story_texts = []
-        for story in tweets:
+        for story in stories:
             if hasattr(story, 'title') and story.title:
                 story_texts.append(story.title)
             else:
@@ -191,8 +191,9 @@ class ClusteringService:
             x=embedding_2d[:, 0].tolist(),
             y=embedding_2d[:, 1].tolist(),
             cluster_labels=[int(l) for l in labels],
-            tweet_texts=story_texts,
-            tweet_ids=[story.id for story in tweets],
+            story_texts=story_texts,
+            story_ids=[story.id for story in stories],
+            story_urls=[story.url or story.hn_url for story in stories],
             colors=[color_map[int(l)] for l in labels],
             cluster_info=cluster_info
         )

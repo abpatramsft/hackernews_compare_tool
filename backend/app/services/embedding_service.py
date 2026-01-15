@@ -4,7 +4,7 @@ from typing import List, Dict
 import torch
 from cachetools import LRUCache
 from app.config import settings
-from app.models import Tweet
+from app.models import Story
 
 
 class EmbeddingService:
@@ -39,12 +39,12 @@ class EmbeddingService:
         text = ' '.join(text.split())
         return text
 
-    def generate_embeddings(self, stories: List[Tweet], search_id: str) -> np.ndarray:
+    def generate_embeddings(self, stories: List[Story], search_id: str) -> np.ndarray:
         """
-        Generate embeddings for a list of stories/tweets.
+        Generate embeddings for a list of stories.
 
         Args:
-            stories: List of Story/Tweet objects
+            stories: List of Story objects
             search_id: Unique identifier for this search
 
         Returns:

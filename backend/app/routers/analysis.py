@@ -35,7 +35,6 @@ async def generate_embeddings(request: EmbedRequest):
 
         return EmbedResponse(
             embedding_complete=True,
-            tweet_count=len(stories),  # Keep for backward compatibility
             story_count=len(stories),
             message=f"Successfully generated embeddings for {len(stories)} stories"
         )
@@ -47,7 +46,7 @@ async def generate_embeddings(request: EmbedRequest):
 
 
 @router.post("/cluster", response_model=ClusterResponse)
-async def cluster_tweets(request: ClusterRequest):
+async def cluster_stories(request: ClusterRequest):
     """
     Perform UMAP dimensionality reduction and clustering on embedded stories.
 
@@ -80,7 +79,7 @@ async def cluster_tweets(request: ClusterRequest):
         cluster_data = clustering_service.analyze_and_cluster(
             search_id=request.search_id,
             embeddings=embeddings,
-            tweets=stories,  # Pass stories as tweets (they're compatible)
+            stories=stories,
             algorithm=request.algorithm,
             n_clusters=request.n_clusters
         )
@@ -94,7 +93,7 @@ async def cluster_tweets(request: ClusterRequest):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error clustering tweets: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error clustering stories: {str(e)}")
 
 
 @router.post("/summarize", response_model=SummaryResponse)
@@ -103,7 +102,7 @@ async def summarize_cluster(request: SummaryRequest):
     Generate a title and summary for a cluster using LLM.
 
     Args:
-        request: SummaryRequest with search_id, cluster_id, and tweet_ids (story IDs)
+        request: SummaryRequest with search_id, cluster_id, and story_ids
 
     Returns:
         SummaryResponse with title and summary
@@ -116,7 +115,7 @@ async def summarize_cluster(request: SummaryRequest):
             raise HTTPException(status_code=404, detail="Search ID not found")
 
         # Filter stories by IDs in the cluster
-        cluster_stories = [s for s in all_stories if s.id in request.tweet_ids]
+        cluster_stories = [s for s in all_stories if s.id in request.story_ids]
 
         if not cluster_stories:
             raise HTTPException(status_code=404, detail="No stories found for the given IDs")
@@ -126,13 +125,13 @@ async def summarize_cluster(request: SummaryRequest):
             cluster_stories, 
             request.cluster_id,
             search_id=request.search_id,
-            tweet_ids=request.tweet_ids
+            story_ids=request.story_ids
         )
 
         return SummaryResponse(
             title=summary_data["title"],
             summary=summary_data["summary"],
-            tweet_count=len(cluster_stories)
+            story_count=len(cluster_stories)
         )
 
     except HTTPException:

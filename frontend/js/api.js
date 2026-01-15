@@ -35,21 +35,18 @@ class HackerNewsAnalysisAPI {
     }
 
     /**
-     * Search for Hacker News stories on a topic
+     * Search for Hacker News stories on a topic (with article content)
      * @param {string} query - Search query
      * @param {string} section - Section identifier (top or bottom)
-     * @returns {Promise} Search response with stories and stats
+     * @param {number} limit - Number of stories to fetch (default 100)
+     * @param {number} days - Lookback window in days (default 5)
+     * @returns {Promise} Search response with stories, content, and stats
      */
-    async searchHackerNews(query, section) {
-        return this.request('/twitter/search', {
+    async searchHackerNews(query, section, limit = 100, days = 5) {
+        return this.request('/hackernews/search_with_content', {
             method: 'POST',
-            body: JSON.stringify({ query, section })
+            body: JSON.stringify({ query, section, limit, days })
         });
-    }
-
-    // Alias for backward compatibility
-    async searchTwitter(query, section) {
-        return this.searchHackerNews(query, section);
     }
 
     /**
@@ -58,7 +55,7 @@ class HackerNewsAnalysisAPI {
      * @returns {Promise} Statistics
      */
     async getStats(searchId) {
-        return this.request(`/twitter/stats/${searchId}`, {
+        return this.request(`/hackernews/stats/${searchId}`, {
             method: 'GET'
         });
     }
@@ -82,7 +79,7 @@ class HackerNewsAnalysisAPI {
      * @param {number} nClusters - Number of clusters (auto-determined if not provided)
      * @returns {Promise} Cluster response with visualization data
      */
-    async clusterTweets(searchId, algorithm = 'kmeans', nClusters = null) {
+    async clusterStories(searchId, algorithm = 'kmeans', nClusters = null) {
         const body = { search_id: searchId, algorithm };
         if (nClusters !== null) {
             body.n_clusters = nClusters;
@@ -98,16 +95,16 @@ class HackerNewsAnalysisAPI {
      * Get LLM-generated summary for a cluster
      * @param {string} searchId - Search ID
      * @param {number} clusterId - Cluster ID
-     * @param {Array<string>} tweetIds - Array of tweet IDs in the cluster
+     * @param {Array<string>} storyIds - Array of story IDs in the cluster
      * @returns {Promise} Summary response with title and summary
      */
-    async getSummary(searchId, clusterId, tweetIds) {
+    async getSummary(searchId, clusterId, storyIds) {
         return this.request('/analysis/summarize', {
             method: 'POST',
             body: JSON.stringify({
                 search_id: searchId,
                 cluster_id: clusterId,
-                tweet_ids: tweetIds
+                story_ids: storyIds
             })
         });
     }
@@ -126,7 +123,7 @@ class HackerNewsAnalysisAPI {
 
         // Step 2: Cluster stories
         console.log('Clustering stories...');
-        const clusterResponse = await this.clusterTweets(searchId, algorithm, nClusters);
+        const clusterResponse = await this.clusterStories(searchId, algorithm, nClusters);
 
         if (!clusterResponse.success) {
             throw new Error(clusterResponse.message);

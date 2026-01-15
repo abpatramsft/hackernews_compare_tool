@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException
-from app.models import SearchRequest, SearchResponse, TweetStats
+from app.models import SearchRequest, SearchResponse, SearchWithContentRequest, StoryStats
 from app.services.hackernews_service import hackernews_service
 
-router = APIRouter(prefix="/twitter", tags=["hackernews"])
+router = APIRouter(prefix="/hackernews", tags=["hackernews"])
 
 
 @router.post("/search", response_model=SearchResponse)
@@ -14,7 +14,7 @@ async def search_stories(request: SearchRequest):
         request: SearchRequest with query and section
 
     Returns:
-        SearchResponse with stories (as tweets for compatibility), stats, and search_id
+        SearchResponse with stories, stats, and search_id
     """
     try:
         stories, stats, search_id = await hackernews_service.search_stories(
@@ -25,8 +25,7 @@ async def search_stories(request: SearchRequest):
         )
 
         return SearchResponse(
-            tweets=stories,  # Keep tweets field for backward compatibility
-            stories=stories,  # New field
+            stories=stories,
             stats=stats,
             search_id=search_id
         )
@@ -35,7 +34,36 @@ async def search_stories(request: SearchRequest):
         raise HTTPException(status_code=500, detail=f"Error searching Hacker News: {str(e)}")
 
 
-@router.get("/stats/{search_id}", response_model=TweetStats)
+@router.post("/search_with_content", response_model=SearchResponse)
+async def search_stories_with_content(request: SearchWithContentRequest):
+    """
+    Search for Hacker News stories and fetch article content in parallel.
+
+    Args:
+        request: SearchWithContentRequest with query, section, limit, and days
+
+    Returns:
+        SearchResponse with stories including content fields, stats, and search_id
+    """
+    try:
+        stories, stats, search_id = await hackernews_service.search_stories_with_content(
+            query=request.query,
+            section=request.section,
+            limit=request.limit,
+            days=request.days
+        )
+
+        return SearchResponse(
+            stories=stories,
+            stats=stats,
+            search_id=search_id
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error searching Hacker News with content: {str(e)}")
+
+
+@router.get("/stats/{search_id}", response_model=StoryStats)
 async def get_stats(search_id: str):
     """
     Get statistics for a previous search.
@@ -44,7 +72,7 @@ async def get_stats(search_id: str):
         search_id: Search ID from previous search
 
     Returns:
-        TweetStats object (contains StoryStats)
+        StoryStats object
     """
     try:
         stats = hackernews_service.get_cached_stats(search_id)

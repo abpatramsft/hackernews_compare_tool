@@ -15,7 +15,7 @@ class Settings(BaseSettings):
 
     # Application Settings
     CACHE_SIZE: int = 1000
-    MAX_TWEETS_PER_SEARCH: int = 1000
+    MAX_STORIES_PER_SEARCH: int = 1000
     EMBEDDING_BATCH_SIZE: int = 32
 
     # CORS Configuration

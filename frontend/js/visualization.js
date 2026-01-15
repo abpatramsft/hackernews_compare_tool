@@ -102,8 +102,8 @@ class VisualizationManager {
             }
             clusterGroups[label].x.push(data.x[index]);
             clusterGroups[label].y.push(data.y[index]);
-            clusterGroups[label].texts.push(data.tweet_texts[index]);
-            clusterGroups[label].ids.push(data.tweet_ids[index]);
+            clusterGroups[label].texts.push(data.story_texts[index]);
+            clusterGroups[label].ids.push(data.story_ids[index]);
         });
 
         // Create traces for each cluster
@@ -357,7 +357,7 @@ class VisualizationManager {
         const clusterStoryIds = [];
         data.cluster_labels.forEach((label, index) => {
             if (label === clusterId) {
-                clusterStoryIds.push(data.tweet_ids[index]);
+                clusterStoryIds.push(data.story_ids[index]);
             }
         });
 
@@ -366,8 +366,9 @@ class VisualizationManager {
         data.cluster_labels.forEach((label, index) => {
             if (label === clusterId) {
                 clusterStories.push({
-                    text: data.tweet_texts[index],
-                    id: data.tweet_ids[index]
+                    text: data.story_texts[index],
+                    id: data.story_ids[index],
+                    url: data.story_urls[index]
                 });
             }
         });
@@ -450,11 +451,18 @@ class VisualizationManager {
         if (stories.length === 0) {
             articlesListEl.innerHTML = '<p style="color: #94a3b8;">No articles found in this cluster.</p>';
         } else {
-            stories.forEach(story => {
+            stories.forEach((story, index) => {
                 const articleDiv = document.createElement('div');
                 articleDiv.className = 'cluster-article-item';
+                
+                const title = story.text || story.title || 'Untitled';
+                const articleUrl = story.url || story.hn_url || '#';
+                const score = story.score || story.likes || 0;
+                const comments = story.comments_count || story.comments || 0;
+                
                 articleDiv.innerHTML = `
-                    <p>${this.escapeHtml(story.text)}</p>
+                    <a href="${articleUrl}" target="_blank" class="article-title-link">${this.escapeHtml(title)}</a>
+                    <div class="article-meta">${score} pts · ${comments} comments</div>
                 `;
                 articlesListEl.appendChild(articleDiv);
             });

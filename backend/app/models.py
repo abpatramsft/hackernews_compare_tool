@@ -9,15 +9,15 @@ class Story(BaseModel):
     title: str
     text: str  # Used for embedding (title or text content)
     url: Optional[str] = None
+    domain: Optional[str] = None
     score: int = 0
     author: str
     created_at: datetime
     comments_count: int = 0
     hn_url: Optional[str] = None
-
-
-# Alias for backward compatibility with existing code
-Tweet = Story
+    content: Optional[str] = None
+    content_fetch_success: Optional[bool] = None
+    content_fetch_error: Optional[str] = None
 
 
 class StoryStats(BaseModel):
@@ -26,21 +26,22 @@ class StoryStats(BaseModel):
     most_upvoted: Optional[Story] = None
 
 
-# Alias for backward compatibility
-TweetStats = StoryStats
-
-
 class SearchRequest(BaseModel):
     """Request model for searching stories."""
     query: str = Field(..., description="Search query for Hacker News")
     section: str = Field(..., description="Section identifier (top or bottom)")
 
 
+class SearchWithContentRequest(SearchRequest):
+    """Request model for searching stories and fetching article content."""
+    limit: int = Field(100, ge=1, le=1000, description="Number of stories to fetch (up to MAX_STORIES_PER_SEARCH)")
+    days: int = Field(5, ge=1, le=365, description="Lookback window in days")
+
+
 class SearchResponse(BaseModel):
     """Response model for story search."""
-    tweets: List[Tweet]  # Keep tweets for backward compatibility
-    stories: List[Story] = Field(default_factory=list)  # New field
-    stats: TweetStats
+    stories: List[Story]
+    stats: StoryStats
     search_id: str
 
 
@@ -52,8 +53,7 @@ class EmbedRequest(BaseModel):
 class EmbedResponse(BaseModel):
     """Response model for embedding generation."""
     embedding_complete: bool
-    tweet_count: int  # Keep for backward compatibility
-    story_count: int = Field(default=0)  # New field
+    story_count: int
     message: str
 
 
@@ -69,8 +69,9 @@ class ClusterData(BaseModel):
     x: List[float] = Field(..., description="X coordinates (UMAP dimension 1)")
     y: List[float] = Field(..., description="Y coordinates (UMAP dimension 2)")
     cluster_labels: List[int] = Field(..., description="Cluster label for each point")
-    tweet_texts: List[str] = Field(..., description="Story/tweet text for each point")
-    tweet_ids: List[str] = Field(..., description="Story/tweet ID for each point")
+    story_texts: List[str] = Field(..., description="Story text for each point")
+    story_ids: List[str] = Field(..., description="Story ID for each point")
+    story_urls: List[Optional[str]] = Field(..., description="Story URL for each point")
     colors: List[str] = Field(..., description="Color for each point")
     cluster_info: Dict[int, Dict[str, Any]] = Field(..., description="Info about each cluster")
 
@@ -86,14 +87,14 @@ class SummaryRequest(BaseModel):
     """Request model for cluster summarization."""
     search_id: str = Field(..., description="Search ID")
     cluster_id: int = Field(..., description="Cluster ID to summarize")
-    tweet_ids: List[str] = Field(..., description="List of story/tweet IDs in the cluster")
+    story_ids: List[str] = Field(..., description="List of story IDs in the cluster")
 
 
 class SummaryResponse(BaseModel):
     """Response model for cluster summary."""
     title: str = Field(..., description="Generated title for the cluster")
     summary: str = Field(..., description="Summary of stories in the cluster")
-    tweet_count: int = Field(..., description="Number of stories in the cluster")
+    story_count: int = Field(..., description="Number of stories in the cluster")
 
 
 class HealthResponse(BaseModel):
