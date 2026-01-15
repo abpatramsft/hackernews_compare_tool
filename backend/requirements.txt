@@ -1,0 +1,26 @@
+# Web Framework
+fastapi
+uvicorn[standard]
+python-multipart
+
+# Hacker News API (via Algolia)
+httpx
+
+# Core numerical libraries (install these first with --only-binary :all:)
+numpy
+scipy
+
+# ML & Embeddings
+torch
+sentence-transformers
+umap-learn
+scikit-learn
+
+# Azure OpenAI
+openai
+
+# Utilities
+python-dotenv
+pydantic
+pydantic-settings
+cachetools

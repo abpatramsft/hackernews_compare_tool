@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hacker News Topic Analysis</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <!-- Plotly.js -->
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Hacker News Topic Analysis</h1>
+            <p>Analyze and cluster Hacker News stories on any topic using ML and AI</p>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <nav class="page-nav">
+            <button id="nav-main" class="nav-tab active">Main</button>
+            <button id="nav-cluster" class="nav-tab">Cluster Analysis</button>
+        </nav>
+
+        <!-- Main Page (Search & Compare) -->
+        <div id="page-main" class="page-content active">
+            <div class="main-content">
+                <!-- Top Section -->
+                <div class="section top-section">
+                    <h2>Topic 1</h2>
+                    <div class="search-container">
+                        <input
+                            type="text"
+                            id="search-top"
+                            class="search-input"
+                            placeholder="Enter topic to search (e.g., AI, Climate Change, etc.)"
+                        >
+                    </div>
+
+                    <div class="stats-container" id="stats-top" style="display: none;">
+                        <div class="stat-card">
+                            <h3>Total News Articles</h3>
+                            <p class="stat-value" id="count-top">0</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Total Reactions</h3>
+                            <p class="stat-value" id="total-reactions-top">0</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Most Upvoted Story</h3>
+                            <p class="tweet-text" id="most-liked-top">-</p>
+                            <p class="likes-count" id="likes-top">0 points</p>
+                            <a id="top-article-link-top" href="#" target="_blank" class="article-link" style="display: none;">Read Article →</a>
+                        </div>
+                    </div>
+
+                    <!-- Top 5 Articles Section -->
+                    <div class="top-articles-section" id="top-articles-top" style="display: none;">
+                        <h3>Top 5 Articles by Reactions</h3>
+                        <div id="top-articles-list-top" class="top-articles-list"></div>
+                    </div>
+
+                    <div class="loading-indicator" id="loading-top" style="display: none;">
+                        <div class="spinner"></div>
+                        <p>Processing...</p>
+                    </div>
+                </div>
+
+                <!-- Bottom Section -->
+                <div class="section bottom-section">
+                    <h2>Topic 2</h2>
+                    <div class="search-container">
+                        <input
+                            type="text"
+                            id="search-bottom"
+                            class="search-input"
+                            placeholder="Enter topic to search (e.g., Technology, Sports, etc.)"
+                        >
+                    </div>
+
+                    <div class="stats-container" id="stats-bottom" style="display: none;">
+                        <div class="stat-card">
+                            <h3>Total News Articles</h3>
+                            <p class="stat-value" id="count-bottom">0</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Total Reactions</h3>
+                            <p class="stat-value" id="total-reactions-bottom">0</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Most Upvoted Story</h3>
+                            <p class="tweet-text" id="most-liked-bottom">-</p>
+                            <p class="likes-count" id="likes-bottom">0 points</p>
+                            <a id="top-article-link-bottom" href="#" target="_blank" class="article-link" style="display: none;">Read Article →</a>
+                        </div>
+                    </div>
+
+                    <!-- Top 5 Articles Section -->
+                    <div class="top-articles-section" id="top-articles-bottom" style="display: none;">
+                        <h3>Top 5 Articles by Reactions</h3>
+                        <div id="top-articles-list-bottom" class="top-articles-list"></div>
+                    </div>
+
+                    <div class="loading-indicator" id="loading-bottom" style="display: none;">
+                        <div class="spinner"></div>
+                        <p>Processing...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Compare Button -->
+            <div class="compare-button-container">
+                <button id="compare-btn" class="btn btn-compare">Compare</button>
+            </div>
+        </div>
+
+        <!-- Cluster Analysis Page -->
+        <div id="page-cluster" class="page-content">
+            <div class="cluster-page-content">
+                <div class="topics-display">
+                    <div class="topic-display-card">
+                        <h3>Topic 1</h3>
+                        <p id="topic-1-display" class="topic-text">-</p>
+                    </div>
+                    <div class="topic-display-card">
+                        <h3>Topic 2</h3>
+                        <p id="topic-2-display" class="topic-text">-</p>
+                    </div>
+                </div>
+
+                <div class="generate-button-container">
+                    <button id="generate-btn" class="btn btn-generate" disabled>Generate</button>
+                </div>
+
+                <div class="loading-indicator" id="loading-generate" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>Generating clusters...</p>
+                </div>
+            </div>
+
+            <!-- Visualization Container -->
+            <div class="visualization-section" id="visualization-section" style="display: none;">
+                <div class="viz-header">
+                    <h2>Cluster Visualization</h2>
+                    <div class="topic-toggle" style="display: none;">
+                        <button id="topic-toggle-1" class="topic-btn active" data-topic="top">Topic 1</button>
+                        <button id="topic-toggle-2" class="topic-btn" data-topic="bottom">Topic 2</button>
+                    </div>
+                </div>
+                <p class="viz-subtitle">Click on any cluster point to see news articles and AI-generated summary</p>
+                <div id="visualization" class="visualization-container"></div>
+                
+                <!-- Cluster Details Section -->
+                <div id="cluster-details" class="cluster-details-section" style="display: none;">
+                    <div class="cluster-details-header">
+                        <h3 id="cluster-details-title">Cluster Topic</h3>
+                        <p id="cluster-details-summary" class="cluster-summary-text"></p>
+                    </div>
+                    <div class="cluster-articles-container">
+                        <h4>Articles in this Cluster (<span id="cluster-articles-count">0</span>)</h4>
+                        <div id="cluster-articles-list" class="cluster-articles-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cluster Modal -->
+        <div id="cluster-modal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2 id="cluster-title">Cluster Analysis</h2>
+                <div class="modal-body">
+                    <div class="summary-section">
+                        <h3>Summary</h3>
+                        <p id="cluster-summary">Loading summary...</p>
+                    </div>
+                    <div class="tweets-section">
+                        <h3>Stories in this Cluster (<span id="tweet-count">0</span>)</h3>
+                        <div id="cluster-tweets" class="tweets-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="js/api.js"></script>
+    <script src="js/visualization.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
