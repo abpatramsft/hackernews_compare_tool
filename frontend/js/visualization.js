@@ -125,7 +125,7 @@ class VisualizationManager {
                 y: group.y,
                 mode: 'markers',
                 type: 'scatter',
-                name: `${clusterName} (${clusterInfo.size})`,
+                name: clusterName,
                 text: group.texts.map(t => this.truncateText(t, 100)),
                 customdata: group.ids.map((id, i) => ({
                     story_id: id,

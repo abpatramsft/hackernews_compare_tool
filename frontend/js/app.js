@@ -33,6 +33,14 @@ class HackerNewsAnalysisApp {
             this.handleGenerate();
         });
 
+        // Back to compare button
+        const backBtn = document.getElementById('back-to-compare');
+        if (backBtn) {
+            backBtn.addEventListener('click', () => {
+                this.switchPage('main');
+            });
+        }
+
         // Allow Enter key to trigger compare on main page
         document.getElementById('search-top').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
@@ -56,7 +64,7 @@ class HackerNewsAnalysisApp {
         this.currentPage = page;
 
         // Update navigation tabs
-        document.querySelectorAll('.nav-tab').forEach(tab => {
+        document.querySelectorAll('.nav-link').forEach(tab => {
             tab.classList.remove('active');
         });
         document.getElementById(`nav-${page}`).classList.add('active');
@@ -85,18 +93,40 @@ class HackerNewsAnalysisApp {
     updateTopicDisplay() {
         const topic1El = document.getElementById('topic-1-display');
         const topic2El = document.getElementById('topic-2-display');
+        const legendTopEl = document.getElementById('legend-top');
+        const legendBottomEl = document.getElementById('legend-bottom');
+        const toggle1El = document.getElementById('topic-toggle-1');
+        const toggle2El = document.getElementById('topic-toggle-2');
         const searchTop = document.getElementById('search-top').value.trim();
         const searchBottom = document.getElementById('search-bottom').value.trim();
 
-        topic1El.textContent = searchTop || '-';
-        topic2El.textContent = searchBottom || '-';
+        topic1El.textContent = searchTop || 'Topic A';
+        topic2El.textContent = searchBottom || 'Topic B';
+
+        // Update legend labels
+        if (legendTopEl) legendTopEl.textContent = searchTop || 'Topic A';
+        if (legendBottomEl) legendBottomEl.textContent = searchBottom || 'Topic B';
+
+        // Update toggle button labels
+        if (toggle1El) toggle1El.textContent = searchTop || 'Topic A';
+        if (toggle2El) toggle2El.textContent = searchBottom || 'Topic B';
+
+        // Show/hide topics row and no-topics message
+        const topicsRow = document.getElementById('topics-row');
+        const noTopics = document.getElementById('no-topics');
 
         // Enable/disable generate button based on whether both searches are done
         const generateBtn = document.getElementById('generate-btn');
         if (this.searchData.top && this.searchData.bottom) {
             generateBtn.disabled = false;
+            if (topicsRow) topicsRow.style.display = 'flex';
+            if (noTopics) noTopics.style.display = 'none';
         } else {
             generateBtn.disabled = true;
+            if (!searchTop && !searchBottom) {
+                if (topicsRow) topicsRow.style.display = 'none';
+                if (noTopics) noTopics.style.display = 'block';
+            }
         }
     }
 
@@ -126,10 +156,9 @@ class HackerNewsAnalysisApp {
             // Both searches completed successfully
             // User can manually navigate to Cluster Analysis page when ready
 
-            // Hide compare button after successful comparison
-            if (topResult && bottomResult) {
-                compareBtn.style.display = 'none';
-            }
+            // Restore compare button after successful comparison
+            compareBtn.disabled = false;
+            compareBtn.textContent = 'Compare';
 
         } catch (error) {
             console.error('Compare error:', error);
@@ -151,9 +180,9 @@ class HackerNewsAnalysisApp {
 
         const generateBtn = document.getElementById('generate-btn');
         const loadingEl = document.getElementById('loading-generate');
-        
+
         generateBtn.disabled = true;
-        loadingEl.style.display = 'block';
+        loadingEl.style.display = 'flex';
 
         try {
             // Generate clusters for both topics in parallel
@@ -201,7 +230,6 @@ class HackerNewsAnalysisApp {
 
         // Show loading state
         this.setLoadingState(section, true);
-        this.hideStats(section);
 
         try {
             // Call search API
@@ -217,7 +245,7 @@ class HackerNewsAnalysisApp {
             }
 
             // Display stats with stories
-            this.displayStats(section, response.stats, stories);
+            this.displayStats(section, response.stats, stories, query);
 
             return response;
 
@@ -235,56 +263,70 @@ class HackerNewsAnalysisApp {
      * @param {string} section - Section identifier
      * @param {Object} stats - Statistics object
      * @param {Array} stories - Array of story objects
+     * @param {string} topicName - Name of the topic
      */
-    displayStats(section, stats, stories = []) {
-        const statsContainer = document.getElementById(`stats-${section}`);
+    displayStats(section, stats, stories = [], topicName = '') {
+        // Update topic name in header
+        const nameEl = document.getElementById(`name-${section}`);
+        if (nameEl) nameEl.textContent = topicName || `Topic ${section === 'top' ? 'A' : 'B'}`;
+
+        // Update article count in header
         const countEl = document.getElementById(`count-${section}`);
-        const totalReactionsEl = document.getElementById(`total-reactions-${section}`);
-        const mostLikedEl = document.getElementById(`most-liked-${section}`);
-        const likesEl = document.getElementById(`likes-${section}`);
-        const topArticleLinkEl = document.getElementById(`top-article-link-${section}`);
+        if (countEl) countEl.textContent = `${stats.count} articles`;
 
-        countEl.textContent = stats.count;
-
-        // Calculate total reactions (sum of all scores)
+        // Calculate stats
         const totalReactions = stories.reduce((sum, story) => {
             const score = story.score || story.likes || 0;
             return sum + score;
         }, 0);
-        totalReactionsEl.textContent = totalReactions.toLocaleString();
+
+        const avgPoints = stories.length > 0 ? Math.round(totalReactions / stories.length) : 0;
+
+        // Update stats section
+        const statsContainer = document.getElementById(`stats-${section}`);
+        const avgPointsEl = document.getElementById(`avg-points-${section}`);
+        const totalReactionsEl = document.getElementById(`total-reactions-${section}`);
+
+        if (avgPointsEl) avgPointsEl.textContent = avgPoints;
+        if (totalReactionsEl) totalReactionsEl.textContent = totalReactions.toLocaleString();
+        if (statsContainer) statsContainer.style.display = 'flex';
 
         // Support both most_liked (old) and most_upvoted (new) fields
         const mostPopular = stats.most_upvoted || stats.most_liked;
-        if (mostPopular) {
+        const topArticleSection = document.getElementById(`top-article-${section}`);
+        const mostLikedEl = document.getElementById(`most-liked-${section}`);
+        const likesEl = document.getElementById(`likes-${section}`);
+        const topArticleLinkEl = document.getElementById(`top-article-link-${section}`);
+
+        if (mostPopular && topArticleSection) {
             const text = mostPopular.title || mostPopular.text;
-            mostLikedEl.textContent = this.truncateText(text, 150);
+            if (mostLikedEl) mostLikedEl.textContent = this.truncateText(text, 150);
             const score = mostPopular.score || mostPopular.likes || 0;
-            likesEl.textContent = `${score} points`;
-            
+            const comments = mostPopular.num_comments || mostPopular.comments || 0;
+            if (likesEl) likesEl.textContent = `${score} pts · ${comments} comments`;
+
             // Show link to article
             const articleUrl = mostPopular.url || mostPopular.hn_url;
-            if (articleUrl) {
+            if (articleUrl && topArticleLinkEl) {
                 topArticleLinkEl.href = articleUrl;
                 topArticleLinkEl.style.display = 'inline-block';
-            } else {
+            } else if (topArticleLinkEl) {
                 topArticleLinkEl.style.display = 'none';
             }
-        } else {
-            mostLikedEl.textContent = 'No stories available';
-            likesEl.textContent = '';
-            topArticleLinkEl.style.display = 'none';
+
+            topArticleSection.style.display = 'block';
+        } else if (topArticleSection) {
+            topArticleSection.style.display = 'none';
         }
 
-        statsContainer.style.display = 'flex';
-
-        // Display top 5 articles if stories are available
+        // Display top articles if stories are available
         if (stories && stories.length > 0) {
             this.displayTopArticles(section, stories);
         }
     }
 
     /**
-     * Display top 5 articles by reaction count
+     * Display top articles by reaction count
      * @param {string} section - Section identifier
      * @param {Array} stories - Array of story objects
      */
@@ -296,44 +338,40 @@ class HackerNewsAnalysisApp {
             return scoreB - scoreA;
         });
 
-        // Get top 5
-        const top5 = sortedStories.slice(0, 5);
+        // Get top 5 (skip first one since it's shown as "top article")
+        const top5 = sortedStories.slice(1, 6);
 
-        const topArticlesSection = document.getElementById(`top-articles-${section}`);
         const topArticlesList = document.getElementById(`top-articles-list-${section}`);
+
+        if (!topArticlesList) return;
 
         // Clear previous content
         topArticlesList.innerHTML = '';
 
         if (top5.length === 0) {
-            topArticlesSection.style.display = 'none';
             return;
         }
 
         // Create article items
         top5.forEach((story, index) => {
             const articleDiv = document.createElement('div');
-            articleDiv.className = 'top-article-item';
-            
+            articleDiv.className = 'article-item';
+
             const title = story.title || story.text || 'Untitled';
             const score = story.score || story.likes || 0;
+            const comments = story.num_comments || story.comments || 0;
             const articleUrl = story.url || story.hn_url || '#';
-            
+
             articleDiv.innerHTML = `
-                <div class="article-rank">${index + 1}</div>
+                <div class="article-rank">${index + 2}</div>
                 <div class="article-content">
                     <a href="${articleUrl}" target="_blank" class="article-title">${this.escapeHtml(title)}</a>
-                    <div class="article-meta">
-                        <span class="article-score">${score} points</span>
-                        ${story.author ? `<span class="article-author">by ${this.escapeHtml(story.author)}</span>` : ''}
-                    </div>
+                    <div class="article-meta">${score} pts · ${comments} comments</div>
                 </div>
             `;
-            
+
             topArticlesList.appendChild(articleDiv);
         });
-
-        topArticlesSection.style.display = 'block';
     }
 
     /**
@@ -348,16 +386,6 @@ class HackerNewsAnalysisApp {
     }
 
     /**
-     * Hide statistics
-     * @param {string} section - Section identifier
-     */
-    hideStats(section) {
-        const statsContainer = document.getElementById(`stats-${section}`);
-        statsContainer.style.display = 'none';
-    }
-
-
-    /**
      * Set loading state for a section
      * @param {string} section - Section identifier
      * @param {boolean} loading - Whether to show loading state
@@ -367,11 +395,11 @@ class HackerNewsAnalysisApp {
         const searchInput = document.getElementById(`search-${section}`);
 
         if (loading) {
-            loadingEl.style.display = 'block';
-            searchInput.disabled = true;
+            if (loadingEl) loadingEl.style.display = 'flex';
+            if (searchInput) searchInput.disabled = true;
         } else {
-            loadingEl.style.display = 'none';
-            searchInput.disabled = false;
+            if (loadingEl) loadingEl.style.display = 'none';
+            if (searchInput) searchInput.disabled = false;
         }
     }
 
