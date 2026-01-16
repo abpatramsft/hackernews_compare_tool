@@ -202,10 +202,102 @@ class ClusteringService:
         self.cluster_results[search_id] = {
             'cluster_data': cluster_data,
             'labels': labels,
-            'embedding_2d': embedding_2d
+            'embedding_2d': embedding_2d,
+            'embeddings': embeddings,
+            'stories': stories
         }
 
         return cluster_data
+
+    def calculate_cluster_graph(self, search_id: str) -> Dict[str, Any]:
+        """
+        Calculate cluster-to-cluster similarity graph for knowledge graph visualization.
+
+        Args:
+            search_id: Search ID with cached cluster results
+
+        Returns:
+            Dictionary with nodes and edges for graph visualization
+        """
+        cached = self.cluster_results.get(search_id, {})
+        if not cached:
+            raise ValueError(f"No cluster results found for search_id: {search_id}")
+
+        labels = cached.get('labels')
+        embeddings = cached.get('embeddings')
+        cluster_data = cached.get('cluster_data')
+        stories = cached.get('stories')
+
+        if labels is None or embeddings is None:
+            raise ValueError("Missing cluster or embedding data")
+
+        # Get unique cluster labels
+        unique_clusters = sorted(set(int(l) for l in labels))
+        n_clusters = len(unique_clusters)
+
+        # Normalize embeddings (L2 normalization)
+        normalized_embeddings = embeddings / np.linalg.norm(embeddings, axis=1, keepdims=True)
+
+        # Calculate cluster centroids in embedding space
+        cluster_centroids = {}
+        cluster_sizes = {}
+        cluster_colors = {}
+        
+        for cluster_id in unique_clusters:
+            # Get all stories in this cluster
+            cluster_indices = np.where(labels == cluster_id)[0]
+            cluster_sizes[cluster_id] = len(cluster_indices)
+            
+            # Calculate centroid as mean of normalized embeddings
+            cluster_centroids[cluster_id] = normalized_embeddings[cluster_indices].mean(axis=0)
+            
+            # Get color from cluster_data
+            if cluster_data:
+                for idx in cluster_indices:
+                    if idx < len(cluster_data.colors):
+                        cluster_colors[cluster_id] = cluster_data.colors[idx]
+                        break
+
+        # Calculate pairwise cosine similarity between cluster centroids
+        edges = []
+        for i, cluster_i in enumerate(unique_clusters):
+            for j, cluster_j in enumerate(unique_clusters):
+                if i < j:  # Only compute upper triangle (symmetric)
+                    # Cosine similarity
+                    similarity = np.dot(
+                        cluster_centroids[cluster_i],
+                        cluster_centroids[cluster_j]
+                    )
+                    # Clamp to [0, 1] range
+                    similarity = max(0, min(1, (similarity + 1) / 2))  # Normalize from [-1, 1] to [0, 1]
+                    
+                    edges.append({
+                        'source': int(cluster_i),
+                        'target': int(cluster_j),
+                        'similarity': float(similarity)
+                    })
+
+        # Create nodes with metadata
+        nodes = []
+        for cluster_id in unique_clusters:
+            # Get cluster label from cluster_data
+            cluster_label = f"Cluster {cluster_id}"
+            if cluster_data and cluster_id in cluster_data.cluster_info:
+                cluster_label = cluster_data.cluster_info[cluster_id].get('label', cluster_label)
+            
+            nodes.append({
+                'id': int(cluster_id),
+                'label': cluster_label,
+                'size': cluster_sizes[cluster_id],
+                'color': cluster_colors.get(cluster_id, '#808080'),
+                'avg_engagement': cluster_data.cluster_info[cluster_id].get('avg_likes', 0) if cluster_data else 0
+            })
+
+        return {
+            'nodes': nodes,
+            'edges': edges,
+            'n_clusters': n_clusters
+        }
 
     def get_cluster_results(self, search_id: str) -> Dict[str, Any]:
         """

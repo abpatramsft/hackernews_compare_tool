@@ -2,7 +2,8 @@ from fastapi import APIRouter, HTTPException
 from app.models import (
     EmbedRequest, EmbedResponse,
     ClusterRequest, ClusterResponse,
-    SummaryRequest, SummaryResponse
+    SummaryRequest, SummaryResponse,
+    ClusterGraphRequest, ClusterGraphResponse
 )
 from app.services.hackernews_service import hackernews_service
 from app.services.embedding_service import embedding_service
@@ -138,3 +139,52 @@ async def summarize_cluster(request: SummaryRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating summary: {str(e)}")
+
+
+@router.post("/cluster-graph", response_model=ClusterGraphResponse)
+async def generate_cluster_graph(request: ClusterGraphRequest):
+    """
+    Generate a cluster similarity graph for knowledge graph visualization.
+
+    Args:
+        request: ClusterGraphRequest with search_id
+
+    Returns:
+        ClusterGraphResponse with node and edge data for graph visualization
+    """
+    try:
+        # Check if clustering has been performed
+        cluster_results = clustering_service.get_cluster_results(request.search_id)
+        
+        if not cluster_results:
+            raise HTTPException(
+                status_code=404,
+                detail="No cluster results found for this search_id. Call /cluster first."
+            )
+
+        # Calculate cluster graph
+        graph_data_dict = clustering_service.calculate_cluster_graph(request.search_id)
+
+        # Build response
+        from app.models import ClusterGraphData, ClusterGraphNode, ClusterGraphEdge
+        
+        nodes = [ClusterGraphNode(**node) for node in graph_data_dict['nodes']]
+        edges = [ClusterGraphEdge(**edge) for edge in graph_data_dict['edges']]
+        
+        graph_data = ClusterGraphData(
+            nodes=nodes,
+            edges=edges,
+            n_clusters=graph_data_dict['n_clusters']
+        )
+
+        return ClusterGraphResponse(
+            success=True,
+            graph_data=graph_data,
+            message=f"Successfully generated graph for {graph_data_dict['n_clusters']} clusters"
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating cluster graph: {str(e)}")
+

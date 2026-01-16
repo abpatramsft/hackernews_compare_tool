@@ -22,6 +22,9 @@ class HackerNewsAnalysisApp {
         document.getElementById('nav-cluster').addEventListener('click', () => {
             this.switchPage('cluster');
         });
+        document.getElementById('nav-knowledge').addEventListener('click', () => {
+            this.switchPageToKnowledgeGraph();
+        });
 
         // Compare button (Main page)
         document.getElementById('compare-btn').addEventListener('click', () => {
@@ -194,6 +197,9 @@ class HackerNewsAnalysisApp {
             vizManager.createClusterVisualization(topViz, this.searchData.top.search_id, 'top');
             vizManager.createClusterVisualization(bottomViz, this.searchData.bottom.search_id, 'bottom');
 
+            // Store flag that clusters are ready for knowledge graph
+            sessionStorage.setItem('clustersGenerated', 'true');
+
             // Show visualization section
             document.getElementById('visualization-section').style.display = 'block';
 
@@ -237,22 +243,30 @@ class HackerNewsAnalysisApp {
             // Call search API
             const response = await api.searchHackerNews(query, section);
 
-            // Store search data
-            this.searchData[section] = response;
-
-            // Get stories for display
-            const stories = response.stories;
-            if (!stories || stories.length === 0) {
+            // Validate stories before storing search data to avoid caching empty/invalid results
+            const stories = response.stories || [];
+            if (!stories.length) {
+                this.searchData[section] = null;
+                this.updateTopicDisplay();
                 throw new Error('No stories found for this topic. Try a different search term.');
             }
 
+            // Store validated search data
+            this.searchData[section] = response;
+
             // Display stats with stories
             this.displayStats(section, response.stats, stories, query);
+
+            // Update topic display to toggle generate button state
+            this.updateTopicDisplay();
 
             return response;
 
         } catch (error) {
             console.error('Search error:', error);
+            // Clear cached search data on failure so clustering can't run with stale IDs
+            this.searchData[section] = null;
+            this.updateTopicDisplay();
             throw error;
         } finally {
             this.setLoadingState(section, false);
@@ -406,6 +420,21 @@ class HackerNewsAnalysisApp {
     }
 
     /**
+     * Switch to knowledge graph page and pass search IDs
+     */
+    switchPageToKnowledgeGraph() {
+        // Store search IDs in sessionStorage so knowledge graph page can retrieve them
+        const searchIds = {
+            top: this.searchData.top?.search_id || null,
+            bottom: this.searchData.bottom?.search_id || null
+        };
+        sessionStorage.setItem('currentSearchIds', JSON.stringify(searchIds));
+        
+        // Navigate to knowledge graph page
+        window.location.href = 'knowledge-graph.html';
+    }
+
+    /**
      * Truncate text to specified length
      * @param {string} text - Text to truncate
      * @param {number} maxLength - Maximum length
@@ -422,5 +451,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const app = new HackerNewsAnalysisApp();
     // Initialize generate button state
     app.updateTopicDisplay();
+    
+    // Handle hash navigation (e.g., from knowledge graph back to cluster page)
+    if (window.location.hash === '#cluster') {
+        app.switchPage('cluster');
+    }
+    
     console.log('Hacker News Analysis App initialized');
 });

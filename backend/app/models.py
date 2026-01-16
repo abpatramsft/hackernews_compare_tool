@@ -97,7 +97,43 @@ class SummaryResponse(BaseModel):
     story_count: int = Field(..., description="Number of stories in the cluster")
 
 
+class ClusterGraphNode(BaseModel):
+    """Represents a node in the cluster graph (a cluster)."""
+    id: int = Field(..., description="Cluster ID")
+    label: str = Field(..., description="Cluster label")
+    size: int = Field(..., description="Number of stories in cluster")
+    color: str = Field(..., description="Cluster color (hex)")
+    avg_engagement: float = Field(..., description="Average engagement (likes) in cluster")
+
+
+class ClusterGraphEdge(BaseModel):
+    """Represents an edge between two clusters (similarity connection)."""
+    source: int = Field(..., description="Source cluster ID")
+    target: int = Field(..., description="Target cluster ID")
+    similarity: float = Field(..., ge=0, le=1, description="Cosine similarity between clusters (0-1)")
+
+
+class ClusterGraphData(BaseModel):
+    """Data structure for cluster similarity graph visualization."""
+    nodes: List[ClusterGraphNode] = Field(..., description="List of cluster nodes")
+    edges: List[ClusterGraphEdge] = Field(..., description="List of similarity edges between clusters")
+    n_clusters: int = Field(..., description="Total number of clusters")
+
+
+class ClusterGraphRequest(BaseModel):
+    """Request model for cluster graph."""
+    search_id: str = Field(..., description="Search ID with clustered results")
+
+
+class ClusterGraphResponse(BaseModel):
+    """Response model for cluster graph."""
+    success: bool = Field(..., description="Whether graph generation succeeded")
+    graph_data: Optional[ClusterGraphData] = None
+    message: str = Field(..., description="Status message")
+
+
 class HealthResponse(BaseModel):
     """Health check response."""
     status: str
     message: str
+
