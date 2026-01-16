@@ -9,6 +9,7 @@ class HackerNewsAnalysisApp {
         };
         this.currentPage = 'main';
         this.initializeEventListeners();
+        this.restoreSearchData();
     }
 
     /**
@@ -254,6 +255,9 @@ class HackerNewsAnalysisApp {
             // Update topic display to toggle generate button state
             this.updateTopicDisplay();
 
+            // Save search data to sessionStorage for persistence across page reloads
+            this.saveSearchData();
+
             return response;
 
         } catch (error) {
@@ -424,6 +428,9 @@ class HackerNewsAnalysisApp {
         };
         sessionStorage.setItem('currentSearchIds', JSON.stringify(searchIds));
         
+        // Store full search data and input values for restoration
+        this.saveSearchData();
+        
         // Navigate to knowledge graph page
         window.location.href = 'knowledge-graph.html';
     }
@@ -438,7 +445,83 @@ class HackerNewsAnalysisApp {
         if (text.length <= maxLength) return text;
         return text.substring(0, maxLength) + '...';
     }
-}
+
+    /**
+     * Update UI for a specific section with stored search data
+     * @param {string} section - Section identifier (top or bottom)
+     * @param {Object} data - Search data object
+     */
+    updateSectionUI(section, data) {
+        if (!data) return;
+        
+        const stories = data.stories || [];
+        const query = document.getElementById(`search-${section}`).value.trim();
+        
+        // Re-display the stats and articles
+        this.displayStats(section, data.stats, stories, query);
+    }
+
+    /**
+     * Save search data and input values to sessionStorage
+     */
+    saveSearchData() {
+        const searchTop = document.getElementById('search-top').value.trim();
+        const searchBottom = document.getElementById('search-bottom').value.trim();
+        
+        const dataToSave = {
+            searchData: this.searchData,
+            inputs: {
+                top: searchTop,
+                bottom: searchBottom
+            }
+        };
+        
+        sessionStorage.setItem('hnCompareData', JSON.stringify(dataToSave));
+    }
+
+    /**
+     * Restore search data and UI from sessionStorage
+     */
+    restoreSearchData() {
+        const savedData = sessionStorage.getItem('hnCompareData');
+        if (!savedData) return;
+        
+        try {
+            const { searchData, inputs } = JSON.parse(savedData);
+            
+            // Restore search data
+            this.searchData = searchData;
+            
+            // Restore input values
+            if (inputs.top) {
+                document.getElementById('search-top').value = inputs.top;
+            }
+            if (inputs.bottom) {
+                document.getElementById('search-bottom').value = inputs.bottom;
+            }
+            
+            // Restore UI for both topics if data exists
+            if (this.searchData.top) {
+                this.updateSectionUI('top', this.searchData.top);
+            }
+            if (this.searchData.bottom) {
+                this.updateSectionUI('bottom', this.searchData.bottom);
+            }
+            
+            // Enable generate button if both topics have data
+            if (this.searchData.top && this.searchData.bottom) {
+                const generateBtn = document.getElementById('generate-btn');
+                if (generateBtn) {
+                    generateBtn.disabled = false;
+                }
+            }
+            
+            console.log('Restored search data from sessionStorage');
+        } catch (error) {
+            console.error('Error restoring search data:', error);
+            sessionStorage.removeItem('hnCompareData');
+        }
+    }}
 
 // Initialize application when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
