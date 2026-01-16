@@ -1,8 +1,7 @@
-from openai import OpenAI
-import json
 from typing import List, Dict, Any
 from app.config import settings
 from app.models import Story
+from app.services import llm_client
 
 
 class LLMService:
@@ -10,11 +9,8 @@ class LLMService:
 
     def __init__(self):
         """Initialize Azure OpenAI client."""
-        self.client = OpenAI(
-            base_url=settings.AZURE_OPENAI_ENDPOINT,
-            api_key=settings.AZURE_OPENAI_API_KEY
-        )
-        self.deployment_name = settings.AZURE_OPENAI_DEPLOYMENT_NAME
+        self.client = llm_client.get_client()
+        self.deployment_name = llm_client.get_deployment_name()
         # Cache for cluster summaries: key = (search_id, cluster_id, story_ids_hash)
         self.summary_cache = {}
 
@@ -109,28 +105,23 @@ Respond in JSON format:
 }}"""
 
         try:
-            # Call Azure OpenAI API
-            response = self.client.chat.completions.create(
-                model=self.deployment_name,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
+            # Call Azure OpenAI API using llm_client
+            response_text = llm_client.call_llm(
+                prompt=user_prompt,
+                system_prompt=system_prompt,
                 temperature=0.7,
-                max_tokens=300
+                max_tokens=300,
+                client=self.client
             )
-
-            # Extract and parse response
-            response_text = response.choices[0].message.content
 
             # Try to parse JSON response
             try:
-                result = json.loads(response_text)
+                result = llm_client.parse_json_response(response_text)
                 summary_data = {
                     "title": result.get("title", f"Cluster {cluster_id}"),
                     "summary": result.get("summary", "Summary not available.")
                 }
-            except json.JSONDecodeError:
+            except Exception:
                 # If JSON parsing fails, use the raw text
                 summary_data = {
                     "title": f"Cluster {cluster_id} Analysis",

@@ -242,11 +242,15 @@ class ClusteringService:
         cluster_centroids = {}
         cluster_sizes = {}
         cluster_colors = {}
+        cluster_story_ids = {}  # Store story IDs for each cluster
         
         for cluster_id in unique_clusters:
             # Get all stories in this cluster
             cluster_indices = np.where(labels == cluster_id)[0]
             cluster_sizes[cluster_id] = len(cluster_indices)
+            
+            # Get story IDs for this cluster
+            cluster_story_ids[cluster_id] = [stories[idx].id for idx in cluster_indices]
             
             # Calculate centroid as mean of normalized embeddings
             cluster_centroids[cluster_id] = normalized_embeddings[cluster_indices].mean(axis=0)
@@ -290,7 +294,8 @@ class ClusteringService:
                 'label': cluster_label,
                 'size': cluster_sizes[cluster_id],
                 'color': cluster_colors.get(cluster_id, '#808080'),
-                'avg_engagement': cluster_data.cluster_info[cluster_id].get('avg_likes', 0) if cluster_data else 0
+                'avg_engagement': cluster_data.cluster_info[cluster_id].get('avg_likes', 0) if cluster_data else 0,
+                'story_ids': cluster_story_ids[cluster_id]  # Add story IDs for summary generation
             })
 
         return {

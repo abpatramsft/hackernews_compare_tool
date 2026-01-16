@@ -110,6 +110,34 @@ class HackerNewsAnalysisAPI {
     }
 
     /**
+     * Get cluster graph data for visualization
+     * @param {string} searchId - Search ID
+     * @returns {Promise} Graph data with nodes and edges
+     */
+    async getClusterGraph(searchId) {
+        return this.request('/analysis/cluster-graph', {
+            method: 'POST',
+            body: JSON.stringify({ search_id: searchId })
+        });
+    }
+
+    /**
+     * Generate hierarchical concept graph for a cluster
+     * @param {string} searchId - Search ID
+     * @param {number} clusterId - Cluster ID
+     * @returns {Promise} Concept graph response with hierarchical nodes
+     */
+    async getConceptGraph(searchId, clusterId) {
+        return this.request('/analysis/concept-graph', {
+            method: 'POST',
+            body: JSON.stringify({
+                search_id: searchId,
+                cluster_id: clusterId
+            })
+        });
+    }
+
+    /**
      * Perform complete analysis pipeline
      * @param {string} searchId - Search ID
      * @param {string} algorithm - Clustering algorithm (only kmeans is supported)
