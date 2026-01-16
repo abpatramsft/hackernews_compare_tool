@@ -81,12 +81,6 @@ class HackerNewsAnalysisApp {
         // Update topic display on cluster page
         if (page === 'cluster') {
             this.updateTopicDisplay();
-        } else {
-            // Hide visualization when switching back to main page
-            const vizSection = document.getElementById('visualization-section');
-            if (vizSection) {
-                vizSection.style.display = 'none';
-            }
         }
     }
 

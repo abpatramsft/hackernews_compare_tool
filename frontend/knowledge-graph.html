@@ -58,30 +58,63 @@
                 <div id="graph-canvas" class="graph-canvas"></div>
             </div>
 
-            <!-- Cluster Details Panel -->
-            <div id="cluster-details" class="cluster-details" style="display: none;">
-                <div class="details-header">
-                    <h2 id="details-title">Cluster Details</h2>
-                    <button class="close-btn" id="close-details">&times;</button>
+            <!-- Cluster View Section (Below Graph) -->
+            <section id="cluster-view" class="cluster-view" style="display: none;">
+                <div class="cluster-view-header">
+                    <h2 id="cluster-view-title">Cluster Details</h2>
+                    <button class="close-btn" id="close-cluster-view">&times;</button>
                 </div>
-                <div class="details-content">
-                    <div class="detail-stat">
-                        <span class="stat-label">Stories:</span>
-                        <span class="stat-value" id="details-size">0</span>
+                
+                <div class="cluster-view-content">
+                    <!-- Cluster Stats -->
+                    <div class="cluster-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">Stories:</span>
+                            <span class="stat-value" id="cluster-size">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Avg. Engagement:</span>
+                            <span class="stat-value" id="cluster-engagement">0</span>
+                        </div>
                     </div>
-                    <div class="detail-stat">
-                        <span class="stat-label">Avg. Engagement:</span>
-                        <span class="stat-value" id="details-engagement">0</span>
+                    
+                    <!-- Cluster Summary -->
+                    <div class="cluster-summary">
+                        <h3>Summary</h3>
+                        <div id="cluster-summary-text" class="summary-text">Loading summary...</div>
                     </div>
-                    <div class="detail-stat">
-                        <span class="stat-label">Summary:</span>
-                        <div id="details-summary" class="summary-text">Loading summary...</div>
+                    
+                    <!-- Generate Concept Graph Button -->
+                    <div class="concept-graph-actions">
+                        <button id="generate-concept-graph" class="primary-btn">
+                            Generate Concept Graph
+                        </button>
+                    </div>
+                    
+                    <!-- Concept Graph Canvas -->
+                    <div id="concept-graph-container" style="display: none;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <h3 style="margin: 0;">Hierarchical Concept Graph</h3>
+                            <button id="fullscreen-concept-btn" class="fullscreen-btn" title="View Fullscreen">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+                                </svg>
+                                Fullscreen
+                            </button>
+                        </div>
+                        <div class="concept-graph-loading" id="concept-loading" style="display: none;">
+                            <div class="spinner"></div>
+                            <span>Analyzing articles and building concept hierarchy...</span>
+                        </div>
+                        <div id="concept-graph-canvas" class="concept-canvas"></div>
                     </div>
                 </div>
-            </div>
+            </section>
         </div>
     </main>
 
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="js/api.js"></script>
     <script src="js/knowledge-graph.js"></script>
 </body>
 </html>

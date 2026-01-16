@@ -18,6 +18,8 @@ const KnowledgeGraphManager = (() => {
     let currentThreshold = 0.5;
     let currentGraphData = null; // Store current graph data for re-rendering
     let calculatedPositions = null; // Store calculated node positions
+    let currentClusterId = null; // Store currently selected cluster ID
+    let isPathHighlighted = false; // Track if a path is currently highlighted
 
     const API_BASE = 'http://localhost:8000/api/v1';
 
@@ -33,8 +35,14 @@ const KnowledgeGraphManager = (() => {
         // Set up page navigation
         setupPageNavigation();
         
-        // Set up details panel close button
-        document.getElementById('close-details').addEventListener('click', hideClusterDetails);
+        // Set up cluster view close button
+        document.getElementById('close-cluster-view').addEventListener('click', hideClusterView);
+        
+        // Set up generate concept graph button
+        document.getElementById('generate-concept-graph').addEventListener('click', generateConceptGraph);
+        
+        // Set up fullscreen button
+        document.getElementById('fullscreen-concept-btn').addEventListener('click', toggleFullscreen);
         
         // Set up generate button
         document.getElementById('generate-graph-btn').addEventListener('click', generateCurrentGraph);
@@ -59,11 +67,47 @@ const KnowledgeGraphManager = (() => {
     }
 
     /**
+     * Clean up old graph data from localStorage to prevent stale data
+     */
+    function cleanupOldGraphData() {
+        try {
+            const validSearchIds = new Set();
+            const storedSearchIds = sessionStorage.getItem('currentSearchIds');
+            
+            if (storedSearchIds) {
+                const ids = JSON.parse(storedSearchIds);
+                if (ids.top) validSearchIds.add(`graphData_${ids.top}`);
+                if (ids.bottom) validSearchIds.add(`graphData_${ids.bottom}`);
+            }
+            
+            // Remove any graphData_* keys that aren't in the current valid set
+            const keysToRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('graphData_') && !validSearchIds.has(key)) {
+                    keysToRemove.push(key);
+                }
+            }
+            
+            keysToRemove.forEach(key => {
+                localStorage.removeItem(key);
+                console.log(`Cleaned up stale graph data: ${key}`);
+            });
+            
+        } catch (e) {
+            console.error('Error cleaning up old graph data:', e);
+        }
+    }
+
+    /**
      * Check initial state and retrieve search IDs from sessionStorage
      */
     function checkInitialState() {
         const storedSearchIds = sessionStorage.getItem('currentSearchIds');
         const clustersGenerated = sessionStorage.getItem('clustersGenerated');
+        
+        // Clean up old graph data from localStorage (keep only relevant ones)
+        cleanupOldGraphData();
         
         if (!clustersGenerated || clustersGenerated !== 'true') {
             // Clusters not generated yet
@@ -92,6 +136,39 @@ const KnowledgeGraphManager = (() => {
                 // Show toggle section if we have search IDs
                 if (searchIds.top || searchIds.bottom) {
                     document.getElementById('topic-toggle-section').style.display = 'flex';
+                    
+                    // Try to load cached graph data from localStorage using search_id as key
+                    if (searchIds.top) {
+                        try {
+                            const cacheKey = `graphData_${searchIds.top}`;
+                            const cachedTop = localStorage.getItem(cacheKey);
+                            if (cachedTop) {
+                                graphData.top = JSON.parse(cachedTop);
+                                console.log('Loaded cached graph data for top topic');
+                            }
+                        } catch (e) {
+                            console.error('Error loading cached graph data for top:', e);
+                        }
+                    }
+                    if (searchIds.bottom) {
+                        try {
+                            const cacheKey = `graphData_${searchIds.bottom}`;
+                            const cachedBottom = localStorage.getItem(cacheKey);
+                            if (cachedBottom) {
+                                graphData.bottom = JSON.parse(cachedBottom);
+                                console.log('Loaded cached graph data for bottom topic');
+                            }
+                        } catch (e) {
+                            console.error('Error loading cached graph data for bottom:', e);
+                        }
+                    }
+                    
+                    // Auto-render if graph data is available
+                    if (graphData[currentTopic]) {
+                        document.getElementById('loading-graph').style.display = 'none';
+                        document.getElementById('graph-canvas').style.display = 'block';
+                        setTimeout(() => renderGraph(graphData[currentTopic]), 100);
+                    }
                 }
             } catch (e) {
                 console.error('Error parsing stored search IDs:', e);
@@ -123,7 +200,13 @@ const KnowledgeGraphManager = (() => {
                 
                 // Switch graph if available
                 if (graphData[topic]) {
-                    renderGraph(graphData[topic]);
+                    document.getElementById('loading-graph').style.display = 'none';
+                    document.getElementById('graph-canvas').style.display = 'block';
+                    setTimeout(() => renderGraph(graphData[topic]), 50);
+                } else {
+                    // No graph data for this topic yet
+                    document.getElementById('graph-canvas').style.display = 'none';
+                    document.getElementById('loading-graph').style.display = 'none';
                 }
             });
         });
@@ -192,8 +275,17 @@ const KnowledgeGraphManager = (() => {
                 throw new Error(result.message);
             }
 
-            // Cache graph data
+            // Cache graph data in memory
             graphData[topic] = result.graph_data;
+            
+            // Save to localStorage for persistence using search_id as key to prevent stale data
+            try {
+                const cacheKey = `graphData_${searchId}`;
+                localStorage.setItem(cacheKey, JSON.stringify(result.graph_data));
+                console.log(`Saved graph data to localStorage with key: ${cacheKey}`);
+            } catch (e) {
+                console.error('Error saving graph data to localStorage:', e);
+            }
             
             // Reset stored positions when generating new graph
             calculatedPositions = null;
@@ -266,6 +358,7 @@ const KnowledgeGraphManager = (() => {
                 originalId: node.id,
                 storiesCount: node.size,
                 engagement: node.avg_engagement,
+                storyIds: node.story_ids || [],
                 x: nodeX,
                 y: nodeY
             });
@@ -321,7 +414,8 @@ const KnowledgeGraphManager = (() => {
                 color: node.color,
                 originalId: node.originalId,
                 storiesCount: node.storiesCount,
-                engagement: node.engagement
+                engagement: node.engagement,
+                storyIds: node.storyIds
             });
         });
         
@@ -519,30 +613,438 @@ const KnowledgeGraphManager = (() => {
     }
 
     /**
-     * Show cluster details panel
+     * Show cluster view section with details
      */
     async function showClusterDetails(nodeAttrs) {
-        const detailsPanel = document.getElementById('cluster-details');
-        document.getElementById('details-title').textContent = nodeAttrs.label;
-        document.getElementById('details-size').textContent = nodeAttrs.storiesCount;
-        document.getElementById('details-engagement').textContent = Math.round(nodeAttrs.engagement * 10) / 10;
+        // Store current cluster ID
+        currentClusterId = nodeAttrs.originalId;
         
-        // Fetch cluster summary if available
+        // Show cluster view section
+        const clusterView = document.getElementById('cluster-view');
+        clusterView.style.display = 'block';
+        
+        // Scroll to cluster view
+        clusterView.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        
+        // Update cluster details
+        document.getElementById('cluster-view-title').textContent = nodeAttrs.label;
+        document.getElementById('cluster-size').textContent = nodeAttrs.storiesCount;
+        document.getElementById('cluster-engagement').textContent = Math.round(nodeAttrs.engagement * 10) / 10;
+        
+        // Fetch and display cluster summary
         const cacheKey = `${currentTopic}-${nodeAttrs.originalId}`;
+        const summaryText = document.getElementById('cluster-summary-text');
+        const clusterTitle = document.getElementById('cluster-view-title');
+        
         if (summaryCache[cacheKey]) {
-            document.getElementById('details-summary').textContent = summaryCache[cacheKey];
+            // Use cached summary
+            summaryText.textContent = summaryCache[cacheKey].summary;
+            clusterTitle.textContent = summaryCache[cacheKey].title;
         } else {
-            document.getElementById('details-summary').textContent = 'No summary available';
+            // Generate summary via API (will use backend cache if available)
+            summaryText.textContent = 'Generating summary...';
+            
+            try {
+                const searchId = searchIds[currentTopic];
+                if (!searchId) {
+                    throw new Error('No search ID available');
+                }
+                
+                // Get story IDs for this cluster
+                const storyIds = nodeAttrs.storyIds || [];
+                
+                // Call API to generate summary (will reuse cache if available)
+                const summaryResponse = await api.getSummary(searchId, nodeAttrs.originalId, storyIds);
+                
+                // Update UI with generated summary
+                clusterTitle.textContent = summaryResponse.title;
+                summaryText.textContent = summaryResponse.summary;
+                
+                // Cache for future use in this session
+                summaryCache[cacheKey] = {
+                    title: summaryResponse.title,
+                    summary: summaryResponse.summary
+                };
+                
+            } catch (error) {
+                console.error('Error generating summary:', error);
+                summaryText.textContent = 'Failed to generate summary. Please try again.';
+            }
         }
-
-        detailsPanel.style.display = 'block';
+        
+        // Hide concept graph container initially
+        document.getElementById('concept-graph-container').style.display = 'none';
+        
+        // Clear any previous concept graph
+        document.getElementById('concept-graph-canvas').innerHTML = '';
     }
 
     /**
-     * Hide cluster details panel
+     * Hide cluster view section
+     */
+    function hideClusterView() {
+        document.getElementById('cluster-view').style.display = 'none';
+        currentClusterId = null;
+    }
+
+    /**
+     * Generate concept graph for current cluster
+     */
+    async function generateConceptGraph() {
+        if (!currentClusterId) {
+            console.error('No cluster selected');
+            return;
+        }
+        
+        const searchId = searchIds[currentTopic];
+        if (!searchId) {
+            console.error('No search ID for current topic');
+            return;
+        }
+        
+        // Show loading state
+        const container = document.getElementById('concept-graph-container');
+        const loading = document.getElementById('concept-loading');
+        const canvas = document.getElementById('concept-graph-canvas');
+        
+        container.style.display = 'block';
+        loading.style.display = 'flex';
+        canvas.innerHTML = '';
+        
+        try {
+            console.log(`Generating concept graph for cluster ${currentClusterId}...`);
+            
+            // Call API to get concept graph
+            const response = await api.getConceptGraph(searchId, currentClusterId);
+            
+            if (!response.success) {
+                throw new Error(response.message);
+            }
+            
+            console.log(`Received concept graph with ${response.nodes.length} nodes`);
+            
+            // Hide loading, render concept tree
+            loading.style.display = 'none';
+            renderConceptTree(response.nodes, response.root_id);
+            
+        } catch (error) {
+            console.error('Error generating concept graph:', error);
+            loading.style.display = 'none';
+            canvas.innerHTML = `
+                <div style="padding: 2rem; text-align: center; color: var(--text-secondary);">
+                    <p>Failed to generate concept graph: ${error.message}</p>
+                </div>
+            `;
+        }
+    }
+
+    /**
+     * Toggle fullscreen mode for concept graph
+     */
+    function toggleFullscreen() {
+        const container = document.getElementById('concept-graph-container');
+        container.classList.toggle('fullscreen');
+        
+        // Re-render to adjust dimensions
+        const canvas = document.getElementById('concept-graph-canvas');
+        if (canvas.querySelector('svg')) {
+            // Store current data and re-render
+            const svg = canvas.querySelector('svg');
+            const hasContent = svg && svg.children.length > 0;
+            
+            if (hasContent) {
+                // Trigger a small delay to let CSS transition complete
+                setTimeout(() => {
+                    // Get stored concept data from canvas dataset
+                    if (canvas.conceptNodes && canvas.conceptRootId) {
+                        renderConceptTree(canvas.conceptNodes, canvas.conceptRootId);
+                    }
+                }, 100);
+            }
+        }
+    }
+
+    /**
+     * Render hierarchical concept tree using D3.js
+     */
+    function renderConceptTree(nodes, rootId) {
+        const canvas = document.getElementById('concept-graph-canvas');
+        canvas.innerHTML = ''; // Clear previous
+        
+        // Store for fullscreen re-render
+        canvas.conceptNodes = nodes;
+        canvas.conceptRootId = rootId;
+        
+        if (!nodes || nodes.length === 0) {
+            canvas.innerHTML = '<div style="padding: 2rem; text-align: center;">No concept data available</div>';
+            return;
+        }
+        
+        // Build hierarchy from flat nodes list
+        const nodeMap = {};
+        nodes.forEach(node => {
+            // Initialize with children from backend
+            nodeMap[node.id] = { 
+                ...node, 
+                children: node.children ? node.children.map(childId => nodeMap[childId]).filter(Boolean) : []
+            };
+        });
+        
+        // First pass: create all nodes
+        nodes.forEach(node => {
+            if (!nodeMap[node.id]) {
+                nodeMap[node.id] = { ...node, children: [] };
+            }
+        });
+        
+        // Second pass: link children using backend's children array
+        nodes.forEach(node => {
+            if (node.children && node.children.length > 0) {
+                nodeMap[node.id].children = node.children
+                    .map(childId => nodeMap[childId])
+                    .filter(Boolean); // Remove any undefined children
+            }
+        });
+        
+        const root = nodeMap[rootId];
+        if (!root) {
+            canvas.innerHTML = '<div style="padding: 2rem; text-align: center;">Invalid root node</div>';
+            return;
+        }
+        
+        // Set up SVG dimensions
+        const margin = { top: 40, right: 200, bottom: 40, left: 200 };
+        const width = canvas.offsetWidth - margin.left - margin.right;
+        const height = Math.max(600, nodes.length * 30); // Increased spacing
+        
+        // Create SVG
+        const svg = d3.select(canvas)
+            .append('svg')
+            .attr('width', width + margin.left + margin.right)
+            .attr('height', height + margin.top + margin.bottom);
+        
+        const g = svg.append('g')
+            .attr('transform', `translate(${margin.left},${margin.top})`);
+        
+        // Create tree layout
+        const treeLayout = d3.tree()
+            .size([height, width]);
+        
+        // Convert to d3 hierarchy
+        const hierarchy = d3.hierarchy(root);
+        const treeData = treeLayout(hierarchy);
+        
+        // Get layer colors - consistent scheme
+        const getLayerColor = (layer) => {
+            if (layer === 0) return '#e0e7ff'; // Light indigo for articles (rightmost)
+            if (layer === 1) return '#10b981'; // Green for article concepts
+            // All higher layers including root: consistent blue
+            return '#3b82f6'; // Solid blue for all aggregated concepts
+        };
+        
+        // Draw links
+        const links = g.selectAll('.concept-link')
+            .data(treeData.links())
+            .enter()
+            .append('path')
+            .attr('class', 'concept-link')
+            .attr('d', d3.linkHorizontal()
+                .x(d => d.y)
+                .y(d => d.x))
+            .attr('data-source-id', d => d.source.data.id)
+            .attr('data-target-id', d => d.target.data.id);
+        
+        // Draw nodes
+        const node = g.selectAll('.concept-node')
+            .data(treeData.descendants())
+            .enter()
+            .append('g')
+            .attr('class', d => d.data.layer === 0 ? 'concept-node article-node' : 'concept-node')
+            .attr('data-node-id', d => d.data.id)
+            .attr('transform', d => `translate(${d.y},${d.x})`);
+        
+        // Node circles (with click handler for path highlighting)
+        node.append('circle')
+            .attr('r', d => {
+                if (d.data.layer === 0) return 4; // Smaller for articles
+                if (d.data.layer === 1) return 6; // Medium for layer 1 concepts
+                return 8; // Larger for higher layers
+            })
+            .style('fill', d => getLayerColor(d.data.layer))
+            .style('cursor', 'pointer')
+            .on('click', function(event, d) {
+                event.stopPropagation();
+                if (isPathHighlighted) {
+                    // If already highlighted, clear on any node click
+                    clearPathHighlight(g);
+                } else {
+                    // Otherwise, highlight the path
+                    highlightPathToRoot(d, treeData, g);
+                }
+            });
+        
+        // Add white background rectangles for text (for better readability)
+        node.append('rect')
+            .attr('class', 'text-background')
+            .attr('x', d => {
+                if (d.children) {
+                    // Left side nodes - calculate based on text length
+                    const label = d.data.label;
+                    const maxLen = 18; // Shorter for left side
+                    const displayText = label.length > maxLen ? label.substring(0, maxLen - 3) + '...' : label;
+                    return -(displayText.length * 6.5) - 12;
+                } else {
+                    return 15; // Right side nodes
+                }
+            })
+            .attr('y', -10)
+            .attr('width', d => {
+                const label = d.data.label;
+                let maxLen;
+                if (d.children) {
+                    maxLen = 18; // Shorter for left-side (parent) nodes
+                } else {
+                    maxLen = d.data.layer === 0 ? 25 : 30; // Longer for right-side (leaf) nodes
+                }
+                const displayText = label.length > maxLen ? label.substring(0, maxLen - 3) + '...' : label;
+                return displayText.length * 6.5 + 8;
+            })
+            .attr('height', 18)
+            .attr('rx', 3)
+            .style('fill', 'white')
+            .style('opacity', 0.9);
+        
+        // Node labels (clickable for article nodes)
+        node.each(function(d) {
+            const nodeGroup = d3.select(this);
+            
+            if (d.data.layer === 0 && (d.data.article_url || d.data.article_hn_url)) {
+                // For article nodes with URLs, create clickable text with proper link handling
+                const textElement = nodeGroup.append('text')
+                    .attr('dy', '0.31em')
+                    .attr('x', d.children ? -15 : 18)
+                    .style('text-anchor', d.children ? 'end' : 'start')
+                    .style('font-weight', '400')
+                    .style('font-size', '10px')
+                    .style('fill', '#2563eb') // Blue color for links
+                    .style('text-decoration', 'underline')
+                    .style('cursor', 'pointer')
+                    .style('pointer-events', 'all') // Ensure text captures pointer events
+                    .text(() => {
+                        const label = d.data.label;
+                        const maxLen = 25;
+                        return label.length > maxLen ? label.substring(0, maxLen - 3) + '...' : label;
+                    })
+                    .attr('title', d.data.label)
+                    .on('click', function(event) {
+                        event.stopPropagation(); // Prevent path highlighting
+                        const url = d.data.article_url || d.data.article_hn_url;
+                        window.open(url, '_blank', 'noopener,noreferrer');
+                    });
+            } else {
+                // Regular non-clickable text for concept nodes
+                nodeGroup.append('text')
+                    .attr('dy', '0.31em')
+                    .attr('x', d.children ? -15 : 18)
+                    .style('text-anchor', d.children ? 'end' : 'start')
+                    .style('font-weight', d.data.layer === 0 ? '400' : '500')
+                    .style('font-size', d.data.layer === 0 ? '10px' : '11px')
+                    .text(() => {
+                        const label = d.data.label;
+                        let maxLen;
+                        if (d.children) {
+                            maxLen = 18; // Shorter for left-side (parent) nodes
+                        } else {
+                            maxLen = d.data.layer === 0 ? 25 : 30;
+                        }
+                        return label.length > maxLen ? label.substring(0, maxLen - 3) + '...' : label;
+                    })
+                    .attr('title', d.data.label);
+            }
+        });
+        
+        // Add tooltips on hover
+        node.append('title')
+            .text(d => {
+                if (d.data.layer === 0) {
+                    let tooltip = `Article: ${d.data.article_title || d.data.label}`;
+                    if (d.data.article_url) {
+                        tooltip += `\nURL: ${d.data.article_url}`;
+                    } else if (d.data.article_hn_url) {
+                        tooltip += `\nHN Discussion: ${d.data.article_hn_url}`;
+                    }
+                    tooltip += `\n\nClick link to open article\nClick circle to highlight path`;
+                    return tooltip;
+                }
+                let tooltip = `Layer ${d.data.layer}: ${d.data.label}`;
+                if (d.data.article_title) {
+                    tooltip += `\nArticle: ${d.data.article_title}`;
+                }
+                if (d.children) {
+                    tooltip += `\nChildren: ${d.children.length}`;
+                }
+                tooltip += `\n\nClick to highlight path / Click again to reset`;
+                return tooltip;
+            });
+    }
+
+    /**
+     * Clear path highlighting
+     */
+    function clearPathHighlight(svgGroup) {
+        svgGroup.selectAll('.concept-node').classed('highlighted dimmed', false);
+        svgGroup.selectAll('.concept-link').classed('highlighted dimmed', false);
+        isPathHighlighted = false;
+    }
+
+    /**
+     * Highlight path from clicked node to root
+     */
+    function highlightPathToRoot(clickedNode, treeData, svgGroup) {
+        // Clear previous highlights
+        clearPathHighlight(svgGroup);
+        
+        // Get path to root
+        const pathNodes = [];
+        let current = clickedNode;
+        while (current) {
+            pathNodes.push(current.data.id);
+            current = current.parent;
+        }
+        
+        // Create set of path node IDs for quick lookup
+        const pathNodeSet = new Set(pathNodes);
+        
+        // Highlight nodes in path, dim others
+        svgGroup.selectAll('.concept-node').classed('highlighted', function() {
+            const nodeId = d3.select(this).attr('data-node-id');
+            return pathNodeSet.has(nodeId);
+        }).classed('dimmed', function() {
+            const nodeId = d3.select(this).attr('data-node-id');
+            return !pathNodeSet.has(nodeId);
+        });
+        
+        // Highlight links in path, dim others
+        svgGroup.selectAll('.concept-link').classed('highlighted', function() {
+            const sourceId = d3.select(this).attr('data-source-id');
+            const targetId = d3.select(this).attr('data-target-id');
+            // A link is in the path if both source and target are in path
+            return pathNodeSet.has(sourceId) && pathNodeSet.has(targetId);
+        }).classed('dimmed', function() {
+            const sourceId = d3.select(this).attr('data-source-id');
+            const targetId = d3.select(this).attr('data-target-id');
+            return !(pathNodeSet.has(sourceId) && pathNodeSet.has(targetId));
+        });
+        
+        // Mark as highlighted
+        isPathHighlighted = true;
+    }
+
+    /**
+     * Hide cluster details panel (deprecated - kept for compatibility)
      */
     function hideClusterDetails() {
-        document.getElementById('cluster-details').style.display = 'none';
+        hideClusterView();
     }
 
     /**

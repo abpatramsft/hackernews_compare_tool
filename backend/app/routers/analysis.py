@@ -3,12 +3,14 @@ from app.models import (
     EmbedRequest, EmbedResponse,
     ClusterRequest, ClusterResponse,
     SummaryRequest, SummaryResponse,
-    ClusterGraphRequest, ClusterGraphResponse
+    ClusterGraphRequest, ClusterGraphResponse,
+    ConceptGraphRequest, ConceptGraphResponse, ConceptGraphNode
 )
 from app.services.hackernews_service import hackernews_service
 from app.services.embedding_service import embedding_service
 from app.services.clustering_service import clustering_service
 from app.services.llm_service import llm_service
+from app.services.concept_graph_service import concept_graph_service
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
 
@@ -187,4 +189,76 @@ async def generate_cluster_graph(request: ClusterGraphRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating cluster graph: {str(e)}")
+
+
+@router.post("/concept-graph", response_model=ConceptGraphResponse)
+async def generate_concept_graph(request: ConceptGraphRequest):
+    """
+    Generate hierarchical concept graph for a specific cluster.
+    
+    Extracts technical concepts from articles, recursively aggregates them
+    into broader themes, and builds a hierarchical tree structure.
+    
+    Args:
+        request: ConceptGraphRequest with search_id and cluster_id
+        
+    Returns:
+        ConceptGraphResponse with hierarchical concept nodes
+    """
+    try:
+        # Check if clustering has been performed
+        cluster_results = clustering_service.get_cluster_results(request.search_id)
+        
+        if not cluster_results:
+            raise HTTPException(
+                status_code=404,
+                detail="No cluster results found for this search_id. Call /cluster first."
+            )
+        
+        # Get stories and labels
+        stories = cluster_results['stories']
+        labels = cluster_results['labels']
+        
+        # Filter stories for this cluster
+        cluster_stories = [
+            story for story, label in zip(stories, labels)
+            if label == request.cluster_id
+        ]
+        
+        if not cluster_stories:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No stories found for cluster {request.cluster_id}"
+            )
+        
+        # Sort by score descending and take top 50
+        cluster_stories.sort(key=lambda s: s.score, reverse=True)
+        top_stories = cluster_stories[:50]
+        
+        print(f"Generating concept graph for cluster {request.cluster_id} with {len(top_stories)} stories (out of {len(cluster_stories)} total)")
+        
+        # Build concept tree
+        result = concept_graph_service.build_concept_tree(
+            stories=top_stories,
+            search_id=request.search_id,
+            cluster_id=request.cluster_id
+        )
+        
+        # Convert to response model
+        nodes = [ConceptGraphNode(**node) for node in result['nodes']]
+        
+        return ConceptGraphResponse(
+            success=True,
+            nodes=nodes,
+            root_id=result['root_id'],
+            layer_count=result['layer_count'],
+            message=f"Successfully generated concept graph with {len(nodes)} concepts across {result['layer_count']} layers"
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error generating concept graph: {str(e)}")
 

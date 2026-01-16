@@ -104,6 +104,7 @@ class ClusterGraphNode(BaseModel):
     size: int = Field(..., description="Number of stories in cluster")
     color: str = Field(..., description="Cluster color (hex)")
     avg_engagement: float = Field(..., description="Average engagement (likes) in cluster")
+    story_ids: List[str] = Field(..., description="List of story IDs in this cluster")
 
 
 class ClusterGraphEdge(BaseModel):
@@ -132,8 +133,37 @@ class ClusterGraphResponse(BaseModel):
     message: str = Field(..., description="Status message")
 
 
+class ConceptGraphNode(BaseModel):
+    """Represents a node in the concept graph hierarchy."""
+    id: str = Field(..., description="Unique node identifier")
+    label: str = Field(..., description="Concept label")
+    layer: int = Field(..., description="Layer in hierarchy (1=article concepts, higher=aggregated)")
+    children: List[str] = Field(default_factory=list, description="List of child node IDs")
+    parent: Optional[str] = Field(None, description="Parent node ID")
+    article_id: Optional[str] = Field(None, description="Article ID (for layer 0 article nodes)")
+    article_title: Optional[str] = Field(None, description="Article title (for layer 0 article nodes)")
+    article_url: Optional[str] = Field(None, description="Article URL (for layer 0 article nodes)")
+    article_hn_url: Optional[str] = Field(None, description="HN discussion URL (for layer 0 article nodes)")
+
+
+class ConceptGraphRequest(BaseModel):
+    """Request model for concept graph generation."""
+    search_id: str = Field(..., description="Search ID with clustered results")
+    cluster_id: int = Field(..., description="Cluster ID to generate concept graph for")
+
+
+class ConceptGraphResponse(BaseModel):
+    """Response model for concept graph."""
+    success: bool = Field(..., description="Whether graph generation succeeded")
+    nodes: List[ConceptGraphNode] = Field(default_factory=list, description="List of concept nodes")
+    root_id: Optional[str] = Field(None, description="Root node ID")
+    layer_count: int = Field(0, description="Total number of layers in graph")
+    message: str = Field(..., description="Status message")
+
+
 class HealthResponse(BaseModel):
     """Health check response."""
     status: str
     message: str
+
 
